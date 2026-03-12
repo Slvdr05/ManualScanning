@@ -207,13 +207,9 @@ def send_data(n_clicks, data, station):
 
         })
 
-    payload = {
-        "events": events
-    }
-
     try:
 
-        r = requests.post(endpoint, json=payload)
+        r = requests.post(endpoint, json=events)
 
         return f"Sent {len(data)} items to {station} | status {r.status_code}", [], ""
     except Exception as e:
