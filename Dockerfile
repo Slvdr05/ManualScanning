@@ -19,8 +19,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Expose Dash default port (your app uses 8052)
-EXPOSE 8052
+# Expose Dash default port (your app uses 8055)
+EXPOSE 8055
 
 # Run the Dash app
-CMD ["python", "out_dashboard2.py"]
+CMD ["python", "OutboundManual.py"]
