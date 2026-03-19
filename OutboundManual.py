@@ -6,18 +6,50 @@ from dash.exceptions import PreventUpdate
 from dash import dash_table
 from datetime import datetime, timezone
 
+import pandas as pd
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
 
 # Endpoints dictionary
 # ===========================================
 
 ENDPOINTS = {
 
-    "station1": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station01",
-    "station2": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station02",
-    "station3": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station03",
-    "station4": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station04"
+    "station01": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station01",
+    "station02": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station02",
+    "station03": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station03",
+    "station04": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station04"
 
 }
+
+# DB Config
+# =========================================================
+
+PGHOST = os.getenv("PGHOST", "localhost")#"192.168.25.48")
+PGPORT = os.getenv("PGPORT", "5432")
+PGDATABASE = os.getenv("PGDATABASE", "mcs-onr-db")
+PGUSER = os.getenv("PGUSER", "postgres")
+PGPASSWORD = os.getenv("PGPASSWORD", "password")#"postgres")
+
+DB_URL = f"postgresql+psycopg2://{PGUSER}:{PGPASSWORD}@{PGHOST}:{PGPORT}/{PGDATABASE}"
+ENGINE: Engine = create_engine(DB_URL, pool_pre_ping=True, pool_recycle=180)
+
+
+# GENERIC SQL
+# =========================================================
+
+QUERY_CARTON = """
+SELECT wo.wave_id, wo.order_id, woc.id, woc.cartonid, woc.status
+FROM wave_order wo
+INNER JOIN wave_order_carton woc ON wo.id = woc.wave_order_id
+WHERE woc.rfid_station = {station} AND woc.carton_state = 'SELECTED'
+"""
+
+QUERY_CARTON_SKU = """
+SELECT sku_code, sku_quantity, sku_quantity_found, status
+FROM wave_order_carton_sku
+WHERE wave_order_carton_id = {carton_id}
+"""
 
 # App
 # ================================================
@@ -35,13 +67,13 @@ app.layout = html.Div([
 
     dcc.Tabs(
         id="station-tabs",
-        value="station1",
+        value="station01",
         children=[
 
-            dcc.Tab(label="Station 1", value="station1"),
-            dcc.Tab(label="Station 2", value="station2"),
-            dcc.Tab(label="Station 3", value="station3"),
-            dcc.Tab(label="Station 4", value="station4"),
+            dcc.Tab(label="Station 1", value="station01"),
+            dcc.Tab(label="Station 2", value="station02"),
+            dcc.Tab(label="Station 3", value="station03"),
+            dcc.Tab(label="Station 4", value="station04"),
 
         ]
     ),
