@@ -28,8 +28,8 @@ ENDPOINTS = {
 # DB CONFIG
 # ===========================================
 
-PGHOST = os.getenv("PGHOST", "localhost")
-PGPORT = os.getenv("PGPORT", "5432")
+PGHOST = os.getenv("PGHOST", "192.168.25.48")
+PGPORT = os.getenv("PGPORT", "2345")
 PGDATABASE = os.getenv("PGDATABASE", "mcs-onr-db")
 PGUSER = os.getenv("PGUSER", "postgres")
 PGPASSWORD = os.getenv("PGPASSWORD", "postgres")
