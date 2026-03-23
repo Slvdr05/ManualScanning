@@ -1,3 +1,4 @@
+import os
 import requests
 
 from dash import Dash, html, dcc
@@ -10,56 +11,64 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
-# Endpoints dictionary
+
+# ===========================================
+# ENDPOINTS
 # ===========================================
 
 ENDPOINTS = {
-
     "station01": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station01",
     "station02": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station02",
     "station03": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station03",
     "station04": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station04"
-
 }
 
-# DB Config
-# =========================================================
 
-PGHOST = os.getenv("PGHOST", "localhost")#"192.168.25.48")
+# ===========================================
+# DB CONFIG
+# ===========================================
+
+PGHOST = os.getenv("PGHOST", "localhost")
 PGPORT = os.getenv("PGPORT", "5432")
 PGDATABASE = os.getenv("PGDATABASE", "mcs-onr-db")
 PGUSER = os.getenv("PGUSER", "postgres")
-PGPASSWORD = os.getenv("PGPASSWORD", "password")#"postgres")
+PGPASSWORD = os.getenv("PGPASSWORD", "postgres")
 
 DB_URL = f"postgresql+psycopg2://{PGUSER}:{PGPASSWORD}@{PGHOST}:{PGPORT}/{PGDATABASE}"
 ENGINE: Engine = create_engine(DB_URL, pool_pre_ping=True, pool_recycle=180)
 
 
-# GENERIC SQL
-# =========================================================
+# ===========================================
+# QUERIES
+# ===========================================
 
 QUERY_CARTON = """
 SELECT wo.wave_id, wo.order_id, woc.id, woc.cartonid, woc.status
 FROM wave_order wo
 INNER JOIN wave_order_carton woc ON wo.id = woc.wave_order_id
-WHERE woc.rfid_station = {station} AND woc.carton_state = 'SELECTED'
+WHERE woc.rfid_station = :station
+ORDER BY woc.updated_at DESC
+LIMIT 1
 """
 
 QUERY_CARTON_SKU = """
 SELECT sku_code, sku_quantity, sku_quantity_found, status
 FROM wave_order_carton_sku
-WHERE wave_order_carton_id = {carton_id}
+WHERE wave_order_carton_id = :carton_id
 """
 
-# App
-# ================================================
+
+# ===========================================
+# APP
+# ===========================================
 
 app = Dash(__name__)
-
 app.title = "Manual Scanner"
 
-# Layout
-# ==================================================
+
+# ===========================================
+# LAYOUT
+# ===========================================
 
 app.layout = html.Div([
 
@@ -69,13 +78,17 @@ app.layout = html.Div([
         id="station-tabs",
         value="station01",
         children=[
-
             dcc.Tab(label="Station 1", value="station01"),
             dcc.Tab(label="Station 2", value="station02"),
             dcc.Tab(label="Station 3", value="station03"),
             dcc.Tab(label="Station 4", value="station04"),
-
         ]
+    ),
+
+    dcc.Interval(
+        id="refresh-interval",
+        interval=1000,
+        n_intervals=0
     ),
 
     html.Br(),
@@ -83,7 +96,7 @@ app.layout = html.Div([
     dcc.Input(
         id="scan-input",
         type="text",
-        placeholder="Scan code and press ENTER",
+        placeholder="Scan Carton or EPC",
         debounce=True,
         autoFocus=True,
         style={
@@ -96,31 +109,48 @@ app.layout = html.Div([
     html.Br(),
     html.Br(),
 
+    # INFO CARTON
+    html.Div(id="carton-info"),
+
+    html.Br(),
+
+    # TABLA SKU
+    dash_table.DataTable(
+        id="sku-table",
+        columns=[
+            {"name": "SKU", "id": "sku_code"},
+            {"name": "Qty", "id": "sku_quantity"},
+            {"name": "Found", "id": "sku_quantity_found"},
+            {"name": "Status", "id": "status"},
+        ],
+        data=[],
+        style_cell={"fontSize": "16px", "padding": "6px"},
+        style_header={"fontWeight": "bold"},
+        style_data_conditional=[
+            {
+                "if": {"filter_query": '{status} = "match"'},
+                "backgroundColor": "#d4edda"
+            },
+            {
+                "if": {"filter_query": '{status} = "unmatch"'},
+                "backgroundColor": "#f8d7da"
+            }
+        ]
+    ),
+
+    html.Br(),
+
     html.H3(id="counter", children="Total scanned: 0"),
 
     html.Br(),
 
     dash_table.DataTable(
-
         id="scan-table",
-
-        columns=[
-            {"name": "Code", "id": "code"}
-        ],
-
+        columns=[{"name": "Code", "id": "code"}],
         data=[],
-
-        style_cell={
-            "fontSize": "18px",
-            "padding": "8px"
-        },
-
-        style_header={
-            "fontWeight": "bold"
-        },
-
+        style_cell={"fontSize": "18px", "padding": "8px"},
+        style_header={"fontWeight": "bold"},
         page_size=20
-
     ),
 
     html.Br(),
@@ -135,84 +165,227 @@ app.layout = html.Div([
         }
     ),
 
+    html.Button(
+        "Reset",
+        id="reset-button",
+        n_clicks=0,
+        style={
+            "fontSize": "18px",
+            "padding": "10px 20px",
+            "marginLeft": "10px",
+            "backgroundColor": "#e74c3c",
+            "color": "white"
+        }
+    ),
+
     html.Br(),
     html.Br(),
 
     html.Div(id="send-result"),
 
-    # memoria local
     dcc.Store(id="scan-store", data=[])
 
 ])
 
-# Scan
-# =====================================================
+
+# ===========================================
+# SCAN INPUT
+# ===========================================
 
 @app.callback(
-
     Output("scan-store", "data"),
     Output("scan-input", "value"),
-
+    Output("send-result", "children"),
     Input("scan-input", "value"),
-
     State("scan-store", "data"),
-
+    State("station-tabs", "value"),
     prevent_initial_call=True
-
 )
-def process_scan(value, stored):
+def process_scan(value, stored, station):
 
     if not value:
         raise PreventUpdate
 
     value = value.strip()
 
-    if value in stored:
-        return stored, ""
+    # For cartonid assigment
+    # =========================
+    if len(value) == 10:
+        try:
+            with ENGINE.connect() as conn:
+                result =conn.execute(
+                    text("SELECT scan_now_open_carton_and_set_station(:cartonid, :station)"),
+                    {
+                        "cartonid": value,
+                        "station": station
+                    }
+                ).fetchone()
+                conn.commit()
 
-    stored.append(value)
+                message = result[0] if result else "No response"
 
-    return stored, ""
+            print(f"Carton opened: {value} at {station}")
+
+        except Exception as e:
+            print(f"Error opening carton: {str(e)}")
+
+        # no se agrega a la tabla
+        return stored, "", message
+    
+    # EPC scan
+    # =========================
+    if len(value) == 24:
+        if value in stored:
+            return stored, "", ""
+
+        stored.append(value)
+
+        return stored, "", ""
+    
+    #Any other scan is ignored
+    # =========================
+    return stored, "", ""
 
 
-# =====================================================
-# ACTUALIZAR TABLA
-# =====================================================
+# ===========================================
+# UPDATE TABLE
+# ===========================================
 
 @app.callback(
-
     Output("scan-table", "data"),
     Output("counter", "children"),
-
     Input("scan-store", "data")
-
 )
 def update_table(data):
-
     table_data = [{"code": x} for x in data]
-
     return table_data, f"Total scanned: {len(data)}"
 
 
-# =====================================================
-# ENVIO A ENDPOINT
-# =====================================================
+# ===========================================
+# RESET
+# ===========================================
 
 @app.callback(
-
-    Output("send-result", "children"),
     Output("scan-store", "data", allow_duplicate=True),
     Output("scan-input", "value", allow_duplicate=True),
+    Input("reset-button", "n_clicks"),
+    prevent_initial_call=True
+)
+def reset_table(n):
+    return [], ""
 
+
+# ===========================================
+# LOAD CARTON INFO
+# ===========================================
+
+@app.callback(
+    Output("carton-info", "children"),
+    Input("refresh-interval", "n_intervals"),
+    Input("scan-input", "value"),
+    State("station-tabs", "value")
+)
+def load_carton(n, scan_value, station):
+
+    try:
+        with ENGINE.connect() as conn:
+            result = conn.execute(
+                text(QUERY_CARTON),
+                {"station": station.upper()}
+            ).fetchone()
+
+        if not result:
+            return "No active carton"
+
+        wave_id, order_id, carton_id, cartonid, status = result
+
+        color_map = {
+            "created": "#3498db",
+            "match": "#2ecc71",
+            "unmatch": "#e74c3c"
+        }
+
+        status_color = color_map.get(status, "#7f8c8d")
+
+        return html.Div([
+
+            html.H2(f"Carton ID: {cartonid}"),
+
+            html.H4([
+                "Status: ",
+                html.Span(
+                    status.upper(),
+                    style={
+                        "color": "white",
+                        "backgroundColor": status_color,
+                        "padding": "5px 10px",
+                        "borderRadius": "5px",
+                        "marginLeft": "5px"
+                    }
+                )
+            ]),
+
+            html.Div(
+                f"Wave: {wave_id} | Order: {order_id}",
+                style={"marginTop": "5px", "color": "#555"}
+            )
+
+        ])
+
+    except Exception as e:
+        return f"Error loading carton: {str(e)}"
+
+
+# ===========================================
+# LOAD SKU TABLE
+# ===========================================
+
+@app.callback(
+    Output("sku-table", "data"),
+    Input("refresh-interval", "n_intervals"),
+    Input("scan-input", "value"),
+    State("station-tabs", "value")
+)
+def load_skus(n, scan_value, station):
+
+    try:
+        with ENGINE.connect() as conn:
+
+            carton = conn.execute(
+                text(QUERY_CARTON),
+                {"station": station.upper()}
+            ).fetchone()
+
+            if not carton:
+                return []
+
+            carton_id = carton[2]
+
+            skus = conn.execute(
+                text(QUERY_CARTON_SKU),
+                {"carton_id": carton_id}
+            ).fetchall()
+
+        return [dict(row._mapping) for row in skus]
+
+    except Exception as e:
+        print(e)
+        return []
+
+
+# ===========================================
+# SEND DATA
+# ===========================================
+
+@app.callback(
+    Output("send-result", "children", allow_duplicate=True),
+    Output("scan-store", "data", allow_duplicate=True),
+    Output("scan-input", "value", allow_duplicate=True),
     Input("send-button", "n_clicks"),
-
     State("scan-store", "data"),
     State("station-tabs", "value"),
-
     prevent_initial_call=True
-
 )
-
 def send_data(n_clicks, data, station):
 
     if not data:
@@ -221,40 +394,31 @@ def send_data(n_clicks, data, station):
     endpoint = ENDPOINTS.get(station)
 
     events = []
-    
-    now = datetime.now(timezone.utc)
 
+    now = datetime.now(timezone.utc)
     str_timestamp = now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "+0000"
 
     for code in data:
-
         events.append({
-
             "data": {
                 "format": "epc",
                 "idHex": code
             },
-
             "timestamp": str_timestamp
-
         })
 
     try:
-
         r = requests.post(endpoint, json=events)
-
         return f"Sent {len(data)} items to {station} | status {r.status_code}", [], ""
     except Exception as e:
-
         return f"Error sending data: {str(e)}", data, ""
 
 
-# =====================================================
+# ===========================================
 # MAIN
-# =====================================================
+# ===========================================
 
 if __name__ == "__main__":
-
     app.run(
         host="0.0.0.0",
         port=8055,
