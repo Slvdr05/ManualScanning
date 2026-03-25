@@ -17,10 +17,10 @@ from sqlalchemy.engine import Engine
 # ===========================================
 
 ENDPOINTS = {
-    "station01": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station01",
-    "station02": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station02",
-    "station03": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station03",
-    "station04": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station04"
+    "station05": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station05",
+    "station06": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station06",
+    "station07": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station07",
+    "station08": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station08"
 }
 
 
@@ -29,7 +29,7 @@ ENDPOINTS = {
 # ===========================================
 
 PGHOST = os.getenv("PGHOST", "192.168.25.48")
-PGPORT = os.getenv("PGPORT", "2345")
+PGPORT = os.getenv("PGPORT", "5432")
 PGDATABASE = os.getenv("PGDATABASE", "mcs-onr-db")
 PGUSER = os.getenv("PGUSER", "postgres")
 PGPASSWORD = os.getenv("PGPASSWORD", "postgres")
@@ -47,7 +47,7 @@ SELECT wo.wave_id, wo.order_id, woc.id, woc.cartonid, woc.status
 FROM wave_order wo
 INNER JOIN wave_order_carton woc ON wo.id = woc.wave_order_id
 WHERE woc.rfid_station = :station
-ORDER BY woc.updated_at DESC
+ORDER BY woc.carton_state DESC, woc.updated_at DESC
 LIMIT 1
 """
 
@@ -76,12 +76,12 @@ app.layout = html.Div([
 
     dcc.Tabs(
         id="station-tabs",
-        value="station01",
+        value="station05",
         children=[
-            dcc.Tab(label="Station 1", value="station01"),
-            dcc.Tab(label="Station 2", value="station02"),
-            dcc.Tab(label="Station 3", value="station03"),
-            dcc.Tab(label="Station 4", value="station04"),
+            dcc.Tab(label="Station 5", value="station05"),
+            dcc.Tab(label="Station 6", value="station06"),
+            dcc.Tab(label="Station 7", value="station07"),
+            dcc.Tab(label="Station 8", value="station08"),
         ]
     ),
 
