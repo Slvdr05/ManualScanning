@@ -17,10 +17,10 @@ from sqlalchemy.engine import Engine
 # ===========================================
 
 ENDPOINTS = {
-    "station05": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station05",
-    "station06": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station06",
-    "station07": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station07",
-    "station08": "http://192.168.25.48:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station08"
+    "station05": "http://192.168.25.22:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station05",
+    "station06": "http://192.168.25.22:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station06",
+    "station07": "http://192.168.25.22:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station07",
+    "station08": "http://192.168.25.22:9087/v1/fbm/mcs/rfid/lam/brazil/onr/epcdata/station08"
 }
 
 
@@ -28,8 +28,8 @@ ENDPOINTS = {
 # DB CONFIG
 # ===========================================
 
-PGHOST = os.getenv("PGHOST", "192.168.25.48")
-PGPORT = os.getenv("PGPORT", "2345")
+PGHOST = os.getenv("PGHOST", "192.168.25.22")
+PGPORT = os.getenv("PGPORT", "5432")
 PGDATABASE = os.getenv("PGDATABASE", "mcs-onr-db")
 PGUSER = os.getenv("PGUSER", "postgres")
 PGPASSWORD = os.getenv("PGPASSWORD", "postgres")
