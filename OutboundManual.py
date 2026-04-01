@@ -148,6 +148,7 @@ app.layout = html.Div([
         id="scan-table",
         columns=[{"name": "Code", "id": "code"}],
         data=[],
+        row_deletable=True,
         style_cell={"fontSize": "18px", "padding": "8px"},
         style_header={"fontWeight": "bold"},
         page_size=20
@@ -274,6 +275,21 @@ def update_table(data):
 def reset_table(n):
     return [], ""
 
+# ===========================================
+# Delete rows from table
+# ===========================================
+
+@app.callback(
+    Output("scan-store", "data", allow_duplicate=True),
+    Input("scan-table", "data"),
+    prevent_initial_call=True
+)
+def sync_table_to_store(table_data):
+
+    if table_data is None:
+        return []
+
+    return [row["code"] for row in table_data]
 
 # ===========================================
 # LOAD CARTON INFO
