@@ -316,9 +316,9 @@ def load_carton(n, scan_value, station):
         wave_id, order_id, carton_id, cartonid, status = result
 
         color_map = {
-            "created": "#3498db",
-            "match": "#2ecc71",
-            "unmatch": "#e74c3c"
+            "CREATED": "#3498db",
+            "MATCH": "#2ecc71",
+            "UNMATCH": "#e74c3c"
         }
 
         status_color = color_map.get(status, "#7f8c8d")
